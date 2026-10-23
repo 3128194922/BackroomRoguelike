@@ -12,13 +12,28 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import java.util.ArrayList;
 import java.util.List;
 
-public record RoomTemplate(ResourceLocation id, CompoundTag nbt) {
+public final class RoomTemplate {
+    private final ResourceLocation id;
+    private final CompoundTag nbt;
+    private final List<BlockState> palette;
+
+    public RoomTemplate(ResourceLocation id, CompoundTag nbt) {
+        this.id = id;
+        this.nbt = nbt;
+        this.palette = resolvePalette();
+    }
+
+    public ResourceLocation id() { return id; }
+    public CompoundTag nbt() { return nbt; }
+
     public int[] size() {
         ListTag size = nbt.getList("size", Tag.TAG_INT);
         return new int[]{size.getInt(0), size.getInt(1), size.getInt(2)};
     }
 
-    public List<BlockState> palette() {
+    public List<BlockState> palette() { return palette; }
+
+    private List<BlockState> resolvePalette() {
         ListTag source = nbt.getList("palette", Tag.TAG_COMPOUND);
         List<BlockState> result = new ArrayList<>(source.size());
         for (int index = 0; index < source.size(); index++) {
@@ -37,7 +52,7 @@ public record RoomTemplate(ResourceLocation id, CompoundTag nbt) {
             }
             result.add(state);
         }
-        return result;
+        return List.copyOf(result);
     }
 
     public void validate() {

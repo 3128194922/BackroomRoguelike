@@ -4,9 +4,7 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Registry;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LevelHeightAccessor;
@@ -17,6 +15,8 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraftforge.registries.DeferredRegister;
+import net.minecraftforge.registries.RegistryObject;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.RandomState;
 import net.minecraft.world.level.levelgen.blending.Blender;
@@ -35,17 +35,19 @@ public final class RoomChunkGenerator extends ChunkGenerator {
     public static final MapCodec<RoomChunkGenerator> CODEC = RecordCodecBuilder.mapCodec(instance -> instance
             .group(BiomeSource.CODEC.fieldOf("biome_source").forGetter(RoomChunkGenerator::getBiomeSource))
             .apply(instance, RoomChunkGenerator::new));
+    // Registry lookup when saving WorldGenSettings uses codec identity, so registration and codec() must share this instance.
+    public static final Codec<RoomChunkGenerator> SERIALIZER = CODEC.codec();
+    public static final DeferredRegister<Codec<? extends ChunkGenerator>> GENERATORS =
+            DeferredRegister.create(Registries.CHUNK_GENERATOR, "backroomroguelike");
+    public static final RegistryObject<Codec<? extends ChunkGenerator>> ROOM_GENERATOR =
+            GENERATORS.register("room_generator", () -> SERIALIZER);
 
     public RoomChunkGenerator(BiomeSource biomeSource) {
         super(biomeSource, (Holder<Biome> biome) -> biome.value().getGenerationSettings());
     }
 
     @Override
-    public Codec<? extends ChunkGenerator> codec() { return CODEC.codec(); }
-
-    public static void register() {
-        Registry.register(BuiltInRegistries.CHUNK_GENERATOR, new ResourceLocation("backroomroguelike", "room_generator"), CODEC.codec());
-    }
+    public Codec<? extends ChunkGenerator> codec() { return SERIALIZER; }
 
     @Override
     public CompletableFuture<ChunkAccess> fillFromNoise(Executor executor, Blender blender, RandomState randomState,
@@ -56,7 +58,7 @@ public final class RoomChunkGenerator extends ChunkGenerator {
             chunk.setBlockState(cursor.set(chunk.getPos().getMinBlockX() + x, minY, chunk.getPos().getMinBlockZ() + z), Blocks.BEDROCK.defaultBlockState(), false);
         }
         int floorY = chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, chunk.getPos().getMinBlockX(), chunk.getPos().getMinBlockZ());
-        RoomTemplate room = RoomPool.select(chunk.getPos().x, chunk.getPos().z);
+        RoomTemplate room = RoomPool.selectForChunk(chunk.getPos().x, chunk.getPos().z);
         placeTemplate(room, chunk, floorY, cursor);
         return CompletableFuture.completedFuture(chunk);
     }
@@ -74,6 +76,7 @@ public final class RoomChunkGenerator extends ChunkGenerator {
             if (x < 0 || x >= size[0] || z < 0 || z >= size[2]
                     || x >= 16 || z >= 16) continue;
             BlockState state = palette.get(entry.getInt("state"));
+            if (state.isAir() || state.is(Blocks.STRUCTURE_VOID)) continue;
             BlockPos worldPos = cursor.set(chunkPos.getMinBlockX() + x, floorY + y, chunkPos.getMinBlockZ() + z).immutable();
             chunk.setBlockState(worldPos, state, false);
             if (entry.contains("nbt", Tag.TAG_COMPOUND)) {
@@ -118,6 +121,6 @@ public final class RoomChunkGenerator extends ChunkGenerator {
 
     @Override
     public void addDebugScreenInfo(List<String> lines, RandomState randomState, BlockPos pos) {
-        lines.add("Backroom room=" + RoomPool.select(pos.getX() >> 4, pos.getZ() >> 4).id());
+        lines.add("Backroom room=" + RoomPool.selectForChunk(pos.getX() >> 4, pos.getZ() >> 4).id());
     }
 }

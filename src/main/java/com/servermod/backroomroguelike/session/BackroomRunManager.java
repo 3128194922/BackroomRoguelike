@@ -7,12 +7,16 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BucketItem;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.ChunkStatus;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.EntityMobGriefingEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
@@ -25,7 +29,9 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Mod.EventBusSubscriber(modid = BackroomRoguelike.MOD_ID)
@@ -35,7 +41,8 @@ public final class BackroomRunManager {
     public static final long RUN_MILLIS = 20L * 60L * 1000L;
     public static final long EXTRACTION_TICKS = 200L;
     private static final Map<UUID, Extraction> EXTRACTIONS = new HashMap<>();
-    private record Extraction(BlockPos pos, long endsAt) {}
+    private static final Set<UUID> PENDING_ENTRIES = new HashSet<>();
+    private record Extraction(BlockPos pos, long endsAt, int announcedSeconds, BlockPos returnFeet) {}
 
     private BackroomRunManager() {}
 
@@ -46,32 +53,52 @@ public final class BackroomRunManager {
             return false;
         }
         BackroomRunData data = BackroomRunData.get(player.serverLevel());
-        if (data.get(player.getUUID()) != null) return false;
-        BackroomRunData.Run run = data.start(player.getUUID());
+        UUID playerId = player.getUUID();
+        if (data.get(playerId) != null || PENDING_ENTRIES.contains(playerId)) return false;
         ServerLevel target = player.getServer().getLevel(BACKROOM);
         if (target == null) {
-            data.finish(player.getUUID());
             player.sendSystemMessage(Component.literal("后室维度未加载，无法进入。"));
             return false;
         }
+        ServerLevel origin = player.serverLevel();
+        BackroomRunData.Run run = data.start(playerId);
         int chunkX = run.originChunkX(), chunkZ = run.originChunkZ();
-        int x = chunkX * 16 + 8, z = chunkZ * 16 + 8;
-        var generatedChunk = target.getChunk(chunkX, chunkZ);
-        int roomFloorY = target.getMinBuildHeight() + 1;
-        BlockPos safeFeet = null;
-        double nearest = Double.MAX_VALUE;
-        for (int localX = 0; localX < 16; localX++) for (int localZ = 0; localZ < 16; localZ++) {
-            BlockPos feet = new BlockPos(chunkX * 16 + localX, roomFloorY + 1, chunkZ * 16 + localZ);
-            if (!generatedChunk.getBlockState(feet).isAir() || !generatedChunk.getBlockState(feet.above()).isAir()
-                    || !generatedChunk.getBlockState(feet.below()).isSolid()) continue;
-            double distance = feet.distSqr(new BlockPos(x, feet.getY(), z));
-            if (distance < nearest) { nearest = distance; safeFeet = feet; }
-        }
-        if (safeFeet == null) safeFeet = new BlockPos(x, roomFloorY + 1, z);
-        player.teleportTo(target, safeFeet.getX() + 0.5, safeFeet.getY(), safeFeet.getZ() + 0.5, player.getYRot(), player.getXRot());
-        if (!player.isCreative() && !player.isSpectator()) player.setGameMode(net.minecraft.world.level.GameType.ADVENTURE);
-        player.sendSystemMessage(Component.literal("本局开始，20 分钟后结算。"));
-        BackroomNetwork.sendTimer(player, RUN_MILLIS);
+        PENDING_ENTRIES.add(playerId);
+        player.sendSystemMessage(Component.literal("正在准备后室入口区块，请稍候。"));
+        target.getChunkSource().getChunkFuture(chunkX, chunkZ, ChunkStatus.FULL, true)
+                .whenComplete((result, failure) -> player.getServer().execute(() -> {
+                    PENDING_ENTRIES.remove(playerId);
+                    if (data.get(playerId) == null) return;
+                    if (failure != null || result == null || result.left().isEmpty()) {
+                        data.finish(playerId);
+                        if (!player.isRemoved() && player.getServer().getPlayerList().getPlayer(playerId) == player) {
+                            player.sendSystemMessage(Component.literal("后室入口区块加载失败，请稍后重试。"));
+                        }
+                        return;
+                    }
+                    if (player.isRemoved() || player.getServer().getPlayerList().getPlayer(playerId) != player
+                            || player.serverLevel() != origin) {
+                        data.finish(playerId);
+                        return;
+                    }
+                    ChunkAccess generatedChunk = result.left().orElseThrow();
+                    int x = chunkX * 16 + 8, z = chunkZ * 16 + 8;
+                    int roomFloorY = target.getMinBuildHeight() + 1;
+                    BlockPos safeFeet = null;
+                    double nearest = Double.MAX_VALUE;
+                    for (int localX = 0; localX < 16; localX++) for (int localZ = 0; localZ < 16; localZ++) {
+                        BlockPos feet = new BlockPos(chunkX * 16 + localX, roomFloorY + 1, chunkZ * 16 + localZ);
+                        if (!generatedChunk.getBlockState(feet).isAir() || !generatedChunk.getBlockState(feet.above()).isAir()
+                                || !generatedChunk.getBlockState(feet.below()).isSolid()) continue;
+                        double distance = feet.distSqr(new BlockPos(x, feet.getY(), z));
+                        if (distance < nearest) { nearest = distance; safeFeet = feet; }
+                    }
+                    if (safeFeet == null) safeFeet = new BlockPos(x, roomFloorY + 1, z);
+                    player.teleportTo(target, safeFeet.getX() + 0.5, safeFeet.getY(), safeFeet.getZ() + 0.5, player.getYRot(), player.getXRot());
+                    if (!player.isCreative() && !player.isSpectator()) player.setGameMode(net.minecraft.world.level.GameType.ADVENTURE);
+                    player.sendSystemMessage(Component.literal("本局开始，20 分钟后结算。"));
+                    BackroomNetwork.sendTimer(player, RUN_MILLIS);
+                }));
         return true;
     }
 
@@ -82,8 +109,12 @@ public final class BackroomRunManager {
         }
         Extraction current = EXTRACTIONS.get(player.getUUID());
         if (current != null && current.pos().equals(pos)) return;
-        EXTRACTIONS.put(player.getUUID(), new Extraction(pos.immutable(), player.level().getGameTime() + EXTRACTION_TICKS));
+        Extraction extraction = new Extraction(pos.immutable(), player.level().getGameTime() + EXTRACTION_TICKS, 10, null);
+        EXTRACTIONS.put(player.getUUID(), extraction);
         player.sendSystemMessage(Component.literal("撤离读条开始：保持在 4 格内并坚持 10 秒。"));
+        player.displayClientMessage(Component.literal("撤离倒计时：10 秒"), true);
+        playExtractionTick(player);
+        preloadReturnLocation(player, extraction);
     }
 
     public static boolean hasActiveRun(ServerPlayer player) {
@@ -112,12 +143,26 @@ public final class BackroomRunManager {
             if (player.level().dimension() != BACKROOM || player.distanceToSqr(extraction.pos().getX() + 0.5, extraction.pos().getY() + 0.5, extraction.pos().getZ() + 0.5) > 16.0) {
                 EXTRACTIONS.remove(player.getUUID());
                 player.sendSystemMessage(Component.literal("撤离读条已中断。"));
+                player.displayClientMessage(Component.literal("撤离读条已中断"), true);
             } else if (player.level().getGameTime() >= extraction.endsAt()) {
-                EXTRACTIONS.remove(player.getUUID());
-                data.finish(player.getUUID());
-                BackroomNetwork.sendTimer(player, -1L);
-                returnToOverworld(player);
-                player.sendSystemMessage(Component.literal("撤离成功，物品已保留。"));
+                if (extraction.returnFeet() == null) {
+                    player.displayClientMessage(Component.literal("正在准备主世界撤离位置…"), true);
+                } else {
+                    EXTRACTIONS.remove(player.getUUID());
+                    data.finish(player.getUUID());
+                    BackroomNetwork.sendTimer(player, -1L);
+                    player.displayClientMessage(Component.empty(), true);
+                    returnToOverworld(player, extraction.returnFeet());
+                    player.sendSystemMessage(Component.literal("撤离成功，物品已保留。"));
+                }
+            } else {
+                long remainingTicks = extraction.endsAt() - player.level().getGameTime();
+                int remainingSeconds = (int) ((remainingTicks + 19L) / 20L);
+                if (remainingSeconds < extraction.announcedSeconds()) {
+                    EXTRACTIONS.put(player.getUUID(), new Extraction(extraction.pos(), extraction.endsAt(), remainingSeconds, extraction.returnFeet()));
+                    player.displayClientMessage(Component.literal("撤离倒计时：" + remainingSeconds + " 秒"), true);
+                    playExtractionTick(player);
+                }
             }
         }
     }
@@ -126,6 +171,7 @@ public final class BackroomRunManager {
     public static void onHurt(LivingHurtEvent event) {
         if (event.getEntity() instanceof ServerPlayer player && EXTRACTIONS.remove(player.getUUID()) != null) {
             player.sendSystemMessage(Component.literal("受到伤害，撤离读条已中断。"));
+            player.displayClientMessage(Component.literal("撤离读条已中断"), true);
         }
     }
 
@@ -151,6 +197,9 @@ public final class BackroomRunManager {
     @SubscribeEvent
     public static void onLogout(PlayerEvent.PlayerLoggedOutEvent event) {
         EXTRACTIONS.remove(event.getEntity().getUUID());
+        if (event.getEntity() instanceof ServerPlayer player && PENDING_ENTRIES.remove(player.getUUID())) {
+            BackroomRunData.get(player.serverLevel()).finish(player.getUUID());
+        }
     }
 
     @SubscribeEvent
@@ -219,17 +268,58 @@ public final class BackroomRunManager {
                 }
             }
         }
-        EXTRACTIONS.remove(player.getUUID());
+        if (EXTRACTIONS.remove(player.getUUID()) != null) player.displayClientMessage(Component.empty(), true);
+        PENDING_ENTRIES.remove(player.getUUID());
         data.finish(player.getUUID());
         BackroomNetwork.sendTimer(player, -1L);
         player.sendSystemMessage(Component.literal(message));
     }
 
+    private static void preloadReturnLocation(ServerPlayer player, Extraction extraction) {
+        ServerLevel overworld = player.getServer().overworld();
+        BlockPos spawn = overworld.getSharedSpawnPos();
+        int chunkX = spawn.getX() >> 4;
+        int chunkZ = spawn.getZ() >> 4;
+        try {
+            overworld.getChunkSource().getChunkFuture(chunkX, chunkZ, ChunkStatus.FULL, true)
+                    .whenComplete((result, failure) -> player.getServer().execute(() -> {
+                        Extraction current = EXTRACTIONS.get(player.getUUID());
+                        if (current == null || !current.pos().equals(extraction.pos()) || current.endsAt() != extraction.endsAt()) return;
+                        if (failure != null || result == null || result.left().isEmpty()) {
+                            EXTRACTIONS.remove(player.getUUID());
+                            if (!player.isRemoved() && player.getServer().getPlayerList().getPlayer(player.getUUID()) == player) {
+                                player.sendSystemMessage(Component.literal("主世界撤离位置加载失败，撤离读条已中断，请重试。"));
+                                player.displayClientMessage(Component.literal("撤离位置加载失败"), true);
+                            }
+                            return;
+                        }
+                        int surfaceY = overworld.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                                spawn.getX(), spawn.getZ());
+                        EXTRACTIONS.put(player.getUUID(), new Extraction(current.pos(), current.endsAt(),
+                                current.announcedSeconds(), new BlockPos(spawn.getX(), surfaceY, spawn.getZ())));
+                    }));
+        } catch (RuntimeException exception) {
+            EXTRACTIONS.remove(player.getUUID());
+            player.sendSystemMessage(Component.literal("主世界撤离位置加载失败，撤离读条已中断，请重试。"));
+            player.displayClientMessage(Component.literal("撤离位置加载失败"), true);
+        }
+    }
+
+    private static void playExtractionTick(ServerPlayer player) {
+        player.playNotifySound(SoundEvents.EXPERIENCE_ORB_PICKUP, SoundSource.PLAYERS, 0.6F, 1.0F);
+    }
+
+    private static void returnToOverworld(ServerPlayer player, BlockPos destination) {
+        ServerLevel overworld = player.getServer().overworld();
+        player.teleportTo(overworld, destination.getX() + 0.5, destination.getY(), destination.getZ() + 0.5, player.getYRot(), player.getXRot());
+        if (!player.isCreative() && !player.isSpectator()) player.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
+    }
+
     private static void returnToOverworld(ServerPlayer player) {
         ServerLevel overworld = player.getServer().overworld();
         BlockPos spawn = overworld.getSharedSpawnPos();
-        int surfaceY = overworld.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, spawn.getX(), spawn.getZ());
-        player.teleportTo(overworld, spawn.getX() + 0.5, surfaceY, spawn.getZ() + 0.5, player.getYRot(), player.getXRot());
-        if (!player.isCreative() && !player.isSpectator()) player.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
+        int surfaceY = overworld.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                spawn.getX(), spawn.getZ());
+        returnToOverworld(player, new BlockPos(spawn.getX(), surfaceY, spawn.getZ()));
     }
 }

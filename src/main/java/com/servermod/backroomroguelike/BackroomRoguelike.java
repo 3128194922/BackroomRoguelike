@@ -14,9 +14,9 @@ public final class BackroomRoguelike {
     public static final String MOD_ID = "backroomroguelike";
 
     public BackroomRoguelike() {
-        RoomChunkGenerator.register();
         BackroomNetwork.register();
         IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
+        RoomChunkGenerator.GENERATORS.register(modBus);
         ModBlocks.BLOCKS.register(modBus);
         ModItems.ITEMS.register(modBus);
         ModCreativeTabs.TABS.register(modBus);

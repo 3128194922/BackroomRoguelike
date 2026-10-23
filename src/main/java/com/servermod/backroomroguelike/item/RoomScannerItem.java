@@ -25,17 +25,18 @@ public final class RoomScannerItem extends Item {
                 serverPlayer.sendSystemMessage(Component.literal("当前没有活动的后室本局，无法扫描撤离点。"));
                 return InteractionResultHolder.sidedSuccess(stack, false);
             }
-            serverPlayer.sendSystemMessage(Component.literal("正在扫描 128 区块范围内的撤离点…"));
-            RoomLocator.findNearest(serverPlayer.serverLevel(), serverPlayer.blockPosition(), EXIT_ROOM, 128, result -> {
+            boolean queued = RoomLocator.findNearest(serverPlayer.getUUID(), serverPlayer.serverLevel(),
+                    serverPlayer.blockPosition(), EXIT_ROOM, 128, result -> {
                 if (!serverPlayer.isAlive() || serverPlayer.connection == null) return;
                 if (result.isEmpty()) serverPlayer.sendSystemMessage(Component.literal("扫描范围内没有预测到撤离点。"));
                 else {
                     var found = result.get();
-                    serverPlayer.sendSystemMessage(Component.literal("最近的撤离点预计位于区块 " + found.chunkPos().x + ", " + found.chunkPos().z
-                            + "（" + found.origin().getX() + ", " + found.origin().getY() + ", " + found.origin().getZ() + "），距离约 "
-                            + Math.round(Math.sqrt(found.distanceSquared())) + " 格。"));
+                    serverPlayer.sendSystemMessage(Component.literal("最近的撤离点预计坐标："
+                            + found.origin().getX() + ", " + found.origin().getY() + ", " + found.origin().getZ()));
                 }
             });
+            if (queued) serverPlayer.sendSystemMessage(Component.literal("正在分段扫描 128 区块范围内的撤离点…"));
+            else serverPlayer.sendSystemMessage(Component.literal("撤离点扫描已在进行中，请等待结果。"));
         }
         return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
     }

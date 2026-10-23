@@ -25,6 +25,9 @@ Minecraft 1.20.1 Forge 模组。玩家进入后室后有 20 分钟探索时间�
 - 每个区块生成一个房间单元，NBT 尺寸为 16×16×16，主体为 15×15，底部地基为 16×16；房间地板跟随区块表面。
 - 39 个密码房变体位于独立随机子池。陶片与 Create 展示框数据按源 NBT 保留。
 - 世界最小高度 -64 处有一层基岩边界。已生成区块保留在存档中；再次进入会使用新区域。
+- 初始房间由 `data/backroomroguelike/structures/rooms/index.json` 指定；模组默认使用 `none.nbt`，新局入口区块固定生成该结构。
+- 自定义房间数据包可在 `data/<命名空间>/structures/rooms/` 放置 `index.json` 和 `.nbt`。示例：
+  `{"initial_structure":"start.nbt","priority":1}`。优先级高于 0 时，仅使用该数据包提供的房间结构，模组内置房间池不参与随机选择；初始结构路径相对于 `structures/rooms/`。
 
 构建
 ----
