@@ -2,7 +2,7 @@ package com.servermod.backroomroguelike.registry;
 
 import com.servermod.backroomroguelike.BackroomRoguelike;
 import com.servermod.backroomroguelike.item.BackroomEntryItem;
-import com.servermod.backroomroguelike.item.RoomScannerItem;
+import com.servermod.backroomroguelike.item.RadioCallerItem;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraftforge.registries.DeferredRegister;
@@ -19,8 +19,8 @@ public final class ModItems {
     public static final RegistryObject<Item> BACKROOM_ENTRY = ITEMS.register(
             "backroom_entry", () -> new BackroomEntryItem(new Item.Properties().stacksTo(1))
     );
-    public static final RegistryObject<Item> ROOM_SCANNER = ITEMS.register(
-            "room_scanner", () -> new RoomScannerItem(new Item.Properties().stacksTo(1))
+    public static final RegistryObject<Item> RADIO_CALLER = ITEMS.register(
+            "radio_caller", () -> new RadioCallerItem(new Item.Properties().stacksTo(1))
     );
 
     private ModItems() {

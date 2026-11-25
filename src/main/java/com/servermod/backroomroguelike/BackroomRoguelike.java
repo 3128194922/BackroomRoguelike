@@ -3,6 +3,7 @@ package com.servermod.backroomroguelike;
 import com.servermod.backroomroguelike.registry.ModBlocks;
 import com.servermod.backroomroguelike.registry.ModCreativeTabs;
 import com.servermod.backroomroguelike.registry.ModItems;
+import com.servermod.backroomroguelike.registry.ModSounds;
 import com.servermod.backroomroguelike.world.RoomChunkGenerator;
 import com.servermod.backroomroguelike.network.BackroomNetwork;
 import net.minecraftforge.eventbus.api.IEventBus;
@@ -19,6 +20,7 @@ public final class BackroomRoguelike {
         RoomChunkGenerator.GENERATORS.register(modBus);
         ModBlocks.BLOCKS.register(modBus);
         ModItems.ITEMS.register(modBus);
+        ModSounds.SOUNDS.register(modBus);
         ModCreativeTabs.TABS.register(modBus);
     }
 }

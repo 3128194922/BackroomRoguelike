@@ -20,7 +20,7 @@ public final class ModCreativeTabs {
                     .icon(() -> ModItems.BACKROOM_ENTRY.get().getDefaultInstance())
                     .displayItems((parameters, output) -> {
                         output.accept(ModItems.BACKROOM_ENTRY.get());
-                        output.accept(ModItems.ROOM_SCANNER.get());
+                        output.accept(ModItems.RADIO_CALLER.get());
                         output.accept(ModItems.EXTRACTION_POINT.get());
                     })
                     .build()

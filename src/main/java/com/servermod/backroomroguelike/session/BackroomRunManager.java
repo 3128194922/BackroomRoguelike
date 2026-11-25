@@ -102,19 +102,20 @@ public final class BackroomRunManager {
         return true;
     }
 
-    public static void startExtraction(ServerPlayer player, BlockPos pos) {
+    public static boolean startExtraction(ServerPlayer player, BlockPos pos) {
         if (player.level().dimension() != BACKROOM || !hasActiveRun(player)) {
             player.sendSystemMessage(Component.literal("当前没有可结算的后室本局。"));
-            return;
+            return false;
         }
         Extraction current = EXTRACTIONS.get(player.getUUID());
-        if (current != null && current.pos().equals(pos)) return;
+        if (current != null && current.pos().equals(pos)) return false;
         Extraction extraction = new Extraction(pos.immutable(), player.level().getGameTime() + EXTRACTION_TICKS, 10, null);
         EXTRACTIONS.put(player.getUUID(), extraction);
         player.sendSystemMessage(Component.literal("撤离读条开始：保持在 4 格内并坚持 10 秒。"));
         player.displayClientMessage(Component.literal("撤离倒计时：10 秒"), true);
         playExtractionTick(player);
         preloadReturnLocation(player, extraction);
+        return true;
     }
 
     public static boolean hasActiveRun(ServerPlayer player) {

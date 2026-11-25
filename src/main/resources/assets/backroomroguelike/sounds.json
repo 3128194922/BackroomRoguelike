@@ -1,0 +1,8 @@
+{
+  "block.extraction_point.activate": {
+    "subtitle": "sounds.backroomroguelike.extraction_point_activate",
+    "sounds": [
+      "backroomroguelike:extraction_point_activate"
+    ]
+  }
+}

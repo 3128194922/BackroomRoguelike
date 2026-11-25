@@ -1,8 +1,10 @@
 package com.servermod.backroomroguelike.block;
 
+import com.servermod.backroomroguelike.registry.ModSounds;
 import com.servermod.backroomroguelike.session.BackroomRunManager;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.core.BlockPos;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
@@ -19,7 +21,9 @@ public final class ExtractionPointBlock extends Block {
                                  net.minecraft.world.phys.BlockHitResult hit) {
         if (level.isClientSide) return InteractionResult.SUCCESS;
         if (player instanceof ServerPlayer serverPlayer && level.dimension() == BackroomRunManager.BACKROOM) {
-            BackroomRunManager.startExtraction(serverPlayer, pos);
+            if (BackroomRunManager.startExtraction(serverPlayer, pos)) {
+                level.playSound(null, pos, ModSounds.EXTRACTION_POINT_ACTIVATE.get(), SoundSource.BLOCKS, 0.9F, 1.0F);
+            }
             return InteractionResult.CONSUME;
         }
         return InteractionResult.PASS;

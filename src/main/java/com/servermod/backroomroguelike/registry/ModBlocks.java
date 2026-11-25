@@ -15,7 +15,9 @@ public final class ModBlocks {
 
     public static final RegistryObject<Block> EXTRACTION_POINT = BLOCKS.register(
             "extraction_point",
-            () -> new ExtractionPointBlock(BlockBehaviour.Properties.copy(Blocks.LODESTONE).strength(-1.0F, 3_600_000.0F))
+            () -> new ExtractionPointBlock(BlockBehaviour.Properties.copy(Blocks.LODESTONE)
+                    .strength(-1.0F, 3_600_000.0F)
+                    .noOcclusion())
     );
 
     private ModBlocks() {
