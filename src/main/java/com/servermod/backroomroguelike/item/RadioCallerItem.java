@@ -38,10 +38,10 @@ public final class RadioCallerItem extends Item {
             boolean queued = RoomLocator.findNearest(serverPlayer.getUUID(), serverPlayer.serverLevel(),
                     serverPlayer.blockPosition(), EXIT_ROOM, 128, result -> {
                 if (!serverPlayer.isAlive() || serverPlayer.connection == null) return;
-                if (result.isEmpty()) serverPlayer.sendSystemMessage(Component.literal("撤离电台没有回应，附近可能没有撤离点。"));
+                if (result.isEmpty()) serverPlayer.sendSystemMessage(Component.literal("撤离电台没有回应，附近可能没有撤离电台。"));
                 else {
                     var found = result.get();
-                    serverPlayer.sendSystemMessage(Component.literal("撤离电台回应：最近撤离点预计坐标："
+                    serverPlayer.sendSystemMessage(Component.literal("撤离电台回应：最近撤离电台预计坐标："
                             + found.origin().getX() + ", " + found.origin().getY() + ", " + found.origin().getZ()));
                 }
             });
@@ -53,7 +53,7 @@ public final class RadioCallerItem extends Item {
 
     @Override
     public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tooltip, TooltipFlag flag) {
-        tooltip.add(Component.literal("右键：呼叫撤离电台，获取最近撤离点坐标").withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.literal("右键：呼叫撤离电台，获取最近撤离电台坐标").withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.literal("仅在后室维度有效").withStyle(ChatFormatting.DARK_GRAY));
     }
 }

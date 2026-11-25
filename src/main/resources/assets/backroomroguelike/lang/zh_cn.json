@@ -1,7 +1,7 @@
 {
   "itemGroup.backroomroguelike": "后室搜打撤",
   "sounds.backroomroguelike.extraction_point_activate": "撤离电台启动",
-  "block.backroomroguelike.extraction_point": "撤离点",
+  "block.backroomroguelike.extraction_point": "撤离电台",
   "item.backroomroguelike.backroom_entry": "后室通行证",
   "item.backroomroguelike.radio_caller": "电台呼叫器"
 }

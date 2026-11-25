@@ -1,7 +1,7 @@
 {
   "itemGroup.backroomroguelike": "Backroom Roguelike",
   "sounds.backroomroguelike.extraction_point_activate": "Extraction beacon activated",
-  "block.backroomroguelike.extraction_point": "Extraction Point",
+  "block.backroomroguelike.extraction_point": "Extraction Radio",
   "item.backroomroguelike.backroom_entry": "Backroom Pass",
   "item.backroomroguelike.radio_caller": "Radio Caller"
 }
